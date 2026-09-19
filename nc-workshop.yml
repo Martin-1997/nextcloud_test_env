@@ -1,0 +1,56 @@
+# This custom template is based on https://github.com/lima-vm/lima/blob/master/templates/docker.yaml
+
+minimumLimaVersion: 2.0.0
+
+
+vmType: vz
+
+# vzNAT has a faster network than vz, but may ignore host VPN configuration. Be careful with that. If you use a VPN, go with vz.
+networks:
+  - vzNAT: true
+
+os: Linux
+arch: "aarch64"
+rosetta:
+  enabled: true
+  binfmt: true
+cpus: 4
+memory: "4GiB"
+
+ssh:
+  forwardAgent: true
+  localPort: 2229
+
+base:
+# - template:_images/ubuntu-lts
+ - template:_images/ubuntu-24.04
+
+# No host directories shared into the guest at all.
+mounts: []
+
+provision:
+- mode: system
+  # This script defines the host.docker.internal hostname when hostResolver is disabled.
+  # It is also needed for lima 0.8.2 and earlier, which does not support hostResolver.hosts.
+  # Names defined in /etc/hosts inside the VM are not resolved inside containers when
+  # using the hostResolver; use hostResolver.hosts instead (requires lima 0.8.3 or later).
+  script: |
+    #!/bin/sh
+    sed -i 's/host.lima.internal.*/host.lima.internal host.docker.internal/' /etc/hosts
+hostResolver:
+  # hostResolver.hosts requires lima 0.8.3 or later. Names defined here will also
+  # resolve inside containers, and not just inside the VM itself.
+  hosts:
+    host.docker.internal: host.lima.internal
+portForwards:
+# Only uncomment that block if you want to access the VM's docker socket from the host
+# - guestSocket: "/var/run/docker.sock"
+#   hostSocket: "{{.Dir}}/sock/docker.sock"
+  # To run `docker` on the host (assumes docker-cli is installed):
+  # $ limactl shell docker docker run -it -v $HOME:$HOME --rm alpine
+  # $ export DOCKER_HOST=$(limactl list docker --format 'unix://{{.Dir}}/sock/docker.sock')
+  # $ docker ...
+- guestPort: 80
+  hostPort: 8080
+- guestPort: 443
+  hostPort: 8443
